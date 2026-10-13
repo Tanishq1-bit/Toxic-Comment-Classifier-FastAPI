@@ -1,7 +1,13 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-MODEL_PATH = "model"
+# Option A: use Hugging Face Hub model (works immediately)
+MODEL_PATH = "unitary/toxic-bert"
+
+
+# Option B: if you later export your fine‑tuned toxic model, set MODEL_PATH = "model"
+# and make sure pytorch_model.bin is inside that folder.
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
@@ -19,7 +25,6 @@ LABELS = [
     "identity_hate"
 ]
 
-# Priority of categories
 PRIORITY = [
     "threat",
     "identity_hate",
@@ -28,8 +33,8 @@ PRIORITY = [
     "insult",
     "toxic"
 ]
-def predict_comment(text: str):
 
+def predict_comment(text: str):
     inputs = tokenizer(
         text,
         return_tensors="pt",
@@ -37,7 +42,6 @@ def predict_comment(text: str):
         padding=True,
         max_length=128
     )
-
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     with torch.no_grad():
@@ -45,49 +49,24 @@ def predict_comment(text: str):
 
     probabilities = torch.sigmoid(outputs.logits)[0]
 
-# Store probabilities of every label
-    scores = {}
+    scores = {label: round(score.item() * 100, 2)
+              for label, score in zip(LABELS, probabilities)}
 
-    for label, score in zip(LABELS, probabilities):
-        scores[label] = round(score.item() * 100, 2)
+    detected_labels = {label: score for label, score in scores.items() if score >= 50}
 
-# Labels above threshold
-    detected_labels = {
-        label: score
-        for label, score in scores.items()
-        if score >= 50
-    }
-
-# Primary Category
     if detected_labels:
-
         primary_category = "Toxic"
-
         for label in PRIORITY:
             if label in detected_labels:
                 primary_category = label.replace("_", " ").title()
                 break
-
     else:
         primary_category = "Non Toxic"
 
-# Risk Level
-    if primary_category == "Threat":
+    if primary_category in ["Threat", "Identity Hate", "Severe Toxic"]:
         risk_level = "High"
-
-    elif primary_category in [
-        "Identity Hate",
-        "Severe Toxic"
-    ]:
-        risk_level = "High"
-
-    elif primary_category in [
-        "Obscene",
-        "Insult",
-        "Toxic"
-    ]:
+    elif primary_category in ["Obscene", "Insult", "Toxic"]:
         risk_level = "Medium"
-
     else:
         risk_level = "Low"
 

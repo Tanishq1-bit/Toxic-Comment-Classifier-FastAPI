@@ -1,0 +1,7 @@
+# Large Hugging Face model files
+model/*.safetensors
+
+# Python cache and virtual environment
+__pycache__/
+.venv/
+.ipynb_checkpoints/
