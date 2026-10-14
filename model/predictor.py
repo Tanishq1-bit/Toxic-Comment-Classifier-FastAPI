@@ -1,20 +1,12 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-# Option A: use Hugging Face Hub model (works immediately)
 MODEL_PATH = "unitary/toxic-bert"
 
-
-# Option B: if you later export your fine‑tuned toxic model, set MODEL_PATH = "model"
-# and make sure pytorch_model.bin is inside that folder.
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
-
-model.to(device)
-model.eval()
+# 1. Set global variables to None initially to avoid startup delays
+device = None
+tokenizer = None
+model = None
 
 LABELS = [
     "toxic",
@@ -34,7 +26,19 @@ PRIORITY = [
     "toxic"
 ]
 
+def load_model_on_demand():
+    global device, tokenizer, model
+    if model is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
+        model.to(device)
+        model.eval()
+
 def predict_comment(text: str):
+    # 2. Trigger model loading only when a prediction route is called
+    load_model_on_demand()
+
     inputs = tokenizer(
         text,
         return_tensors="pt",
